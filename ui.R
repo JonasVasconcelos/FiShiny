@@ -7,18 +7,24 @@
 #####
 ##################################################
 
-check.packages <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-  if (length(new.pkg)) 
-    install.packages(new.pkg, dependencies = TRUE)
-  sapply(pkg, require, character.only = TRUE)
-}
+# check.packages <- function(pkg){
+#   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+#   if (length(new.pkg)) 
+#     install.packages(new.pkg, dependencies = TRUE)
+#   sapply(pkg, require, character.only = TRUE)
+# }
 
-# Usage example
-packages<-c("shiny", "FSA", "fishmethods", "AICcmodavg", 
-            "nlstools", "shinydashboard", "shinyWidgets", 
-            "ggplot2", "waiter","shinyalert")
-check.packages(packages)
+library("shiny")
+library("FSA")
+library("fishmethods")
+library("AICcmodavg")
+library("nlstools")
+library("shinydashboard")
+library("shinyWidgets")
+library("ggplot2")
+library("waiter")
+library("shinyalert")
+
 
 title <- a(href="https://github.com/JonasVasconcelos",
            style = "font-family: monospace; color: white;",
@@ -26,7 +32,7 @@ title <- a(href="https://github.com/JonasVasconcelos",
            strong('FiShiny'))
            
 
-sidebar <- dashboardSidebar(
+sidebar <- {dashboardSidebar(
   sidebarMenu(id = "tabs", 
               menuItem("Home", tabName = "home", 
                        icon = icon("home")),
@@ -35,7 +41,7 @@ sidebar <- dashboardSidebar(
                        icon = icon("chart-line"),
                        menuSubItem(text = "Input", tabName = "lwrinput", 
                                    icon = icon("upload")),
-                       menuSubItem("Graph and Fit", tabName = "graphfit", 
+                       menuSubItem("Graph and Fit", tabName = "graphlwr", 
                                    icon = icon("bar-chart-o"))
               ),
               
@@ -60,13 +66,13 @@ sidebar <- dashboardSidebar(
                                    icon = icon("ruler-horizontal"))
               )
   )
-)
+)}
 
-Home <- tabItem(tabName = "home",
+Home <- {tabItem(tabName = "home",
                 p("Do you have trouble with growth model fits? Your problems are over there that is an easy way to fit the von Bertalanffy, Gompertz, and Logistic functions. And as a tip, you can set how many bootstraps you want for confidence intervals, use the Akaike criterion for model evaluation, and run comparisons between groups.",
-                style = "font-family: 'helvetica'; font-size: 12pt; text-align: justify"))
+                style = "font-family: 'helvetica'; font-size: 12pt; text-align: justify"))}
 
-AgeInput <- tabItem(tabName = "ageinput",
+AgeInput <- {tabItem(tabName = "ageinput",
                     fluidRow(
                       box(title = "Input sets",
                           status = "primary",
@@ -101,9 +107,195 @@ AgeInput <- tabItem(tabName = "ageinput",
                           uiOutput("agetb")
                       )
                     )
-            )
+)}
 
-LWRInput <- tabItem(tabName = "lwrinput",
+GraphInputAge <- {tabItem(tabName = "graph",
+                          fluidRow(
+                            box(title = "Variables and Graphical Parameters",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                selectInput("agex", "1. Select x-variable",
+                                            choices = "", selected = "", multiple = F),
+                                
+                                selectInput("agey", "2. Select y-variable",
+                                            choices = "", selected = "", multiple = F),
+                                
+                                textInput("xlab", "3. Type the x-label."),
+                                textInput("ylab", "4. Type the y-label."),
+                                
+                                numericInput("agepch", "5. Choose the symbol points.",min = 1, max = 20, step = 1, value = 1),
+                                selectInput("agecolpt", "6. Choose the color points.", 
+                                            choices = c("Black" = 1,
+                                                        "Red" = 2,
+                                                        "Green" = 3,
+                                                        "Blue" = 4,
+                                                        "Cyan" = 5,
+                                                        "Magenta" = 6,
+                                                        "Yellow" = 7,
+                                                        "Gray" = 8),
+                                            multiple = F, selected = 1),
+                                
+                                radioButtons("downloadfile", "Select the file type:",
+                                             choices = c("tiff" = "tiff", 
+                                                         "jpeg" = "jpeg")),
+                                numericInput("width", "Width (px):", value = 2400, min = 800, max = 4000),
+                                numericInput("height", "Height (px):", value = 1800, min = 600, max = 3000),
+                                numericInput("res", "Resolution (dpi):", value = 300, min = 72, max = 300)
+                            ),
+                            
+                            box(title = "Plot",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                plotOutput("plot")
+                            )
+                          )
+)}
+
+ModelGraphsAge <- {tabItem(tabName = "models",
+                          fluidRow(
+                            tabBox(
+                              title = "Input",
+                              tabPanel(
+                                title = "Models",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                
+                                checkboxInput("modelsvbgf","von Bertalanffy", F),
+                                checkboxInput("modelsgomp","Gompertz", F),
+                                checkboxInput("modelslog","Logistic", F),
+                                
+                                checkboxInput("boot","Bootstrap", F),
+                                numericInput("nboot", "How many bootstrap do you want?",
+                                             value = 999),
+                                
+                                plotOutput("plot2", brush = "plot_brush")
+                              ),
+                              
+                              tabPanel(
+                                title = "von Bertalanffy",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                
+                                shinyjs::useShinyjs(),
+                                sliderInput("vbgfL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
+                                sliderInput("vbgfK", "K", min = 0, max = 5, value = 1, step = 0.01),
+                                sliderInput("vbgft0", "t0", min = -2.5, max = 2.5, value = 0, step = 0.01),
+                                
+                                plotOutput("plot3", brush = "plot_brush")
+                              ),
+                              
+                              tabPanel(
+                                title = "Gompertz",
+                                status = "primary",
+                                
+                                sliderInput("gompL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
+                                sliderInput("gompgi", "gi", min = 0.001, max = 10, value = 5, step = 0.01),
+                                sliderInput("gompti", "ti", min = -5, max = 5, value = 0, step = 0.01),
+                                
+                                plotOutput("plot4", brush = "plot_brush")
+                              ),
+                              
+                              tabPanel(
+                                title = "Logistic",
+                                status = "primary",
+                                sliderInput("logL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
+                                sliderInput("logginf", "gninf", min = 0.001, max = 5, value = 2.5, step = 0.01),
+                                sliderInput("logti", "ti", min = -5, max = 5, value = 0, step = 0.01),
+                                
+                                plotOutput("plot5", brush = "plot_brush")
+                              )
+                            ),
+                            
+                            tabBox(
+                              title = "Fit",
+                              tabPanel(
+                                title = "von Bertalanffy",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                plotOutput("vbgfBoot2"),
+                                downloadButton("downVBGF", 
+                                               "Download the plot"),
+                                verbatimTextOutput("modVBGF2"),
+                                downloadButton("downloadDataVBGF",
+                                               "Download stats")
+                              ),
+                              
+                              tabPanel(
+                                title = "Gompertz",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                plotOutput("gomBoot"),
+                                downloadButton("downGomp", 
+                                               "Download the plot"),
+                                verbatimTextOutput("modGom2"),
+                                downloadButton("downloadDataGomp",
+                                               "Download stats") 
+                              ),
+                              
+                              tabPanel(
+                                title = "Logistic",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                plotOutput("logBoot2"),
+                                downloadButton("downLog", 
+                                               "Download the plot"),
+                                verbatimTextOutput("modLog2"),
+                                downloadButton("downloadDataLog",
+                                               "Download stats") 
+                              ),
+                              
+                              tabPanel(
+                                title = "All model",
+                                status = "primary",
+                                solidHeader = T,
+                                collapsible = TRUE,
+                                plotOutput("todos"),
+                                downloadButton("downAll", 
+                                               "Download the plot"),
+                                tableOutput("AICprint"),
+                                downloadButton("downloadAIC", 
+                                               "Download the AIC table")
+                              )
+                            )
+                          )
+)}
+
+KimuraAge <- {tabItem(tabName = "kimura",
+                     fluidRow(
+                       box(
+                         title = "Kimura",
+                         status = "primary",
+                         solidHeader = T,
+                         collapsible = TRUE,
+                         
+                         selectInput("kimurafactor", "Which group?", 
+                                     choices = "", selected = "", multiple = F),
+                         radioButtons(inputId = "kimuramodel",
+                                      label = "Model",
+                                      choices = c("von Bertalanffy" = 1,
+                                                  "Gompertz" = 2,
+                                                  "Logistic" = 3))),
+                       
+                       box(
+                         title = "Stats",
+                         status = "primary",
+                         solidHeader = T,
+                         collapsible = TRUE,
+                         downloadButton("downloadKimura", 
+                                        "Download stats"),
+                         verbatimTextOutput("kimuraTab")
+                       )
+                     )
+)}
+
+LWRInput <- {tabItem(tabName = "lwrinput",
                     fluidRow(
                       box(title = "Input sets",
                           status = "primary",
@@ -115,11 +307,11 @@ LWRInput <- tabItem(tabName = "lwrinput",
                                     multiple = T),
                           helpText("Select the read.table parameters below"),
                           
-                          checkboxInput(inputId = "header",
+                          checkboxInput(inputId = "lwrheader",
                                         label = "Header",
                                         value = T),
                           
-                          checkboxInput(inputId = "stringAsFactors",
+                          checkboxInput(inputId = "lwrstringAsFactors",
                                         label = "stringAsFactors",
                                         value = T),
                           
@@ -138,194 +330,90 @@ LWRInput <- tabItem(tabName = "lwrinput",
                           uiOutput("lwrtb")
                       )
                     )
-)
+                  )}
 
-GraphInputAge <- tabItem(tabName = "graph",
-                        fluidRow(
-                          box(title = "Variables and Graphical Parameters",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              selectInput("agex", "1. Select x-variable",
-                                          choices = "", selected = "", multiple = F),
-                            
-                              selectInput("agey", "2. Select y-variable",
-                                          choices = "", selected = "", multiple = F),
-                                    
-                              textInput("xlab", "3. Type the x-label."),
-                              textInput("ylab", "4. Type the y-label."),
-                                    
-                              numericInput("agepch", "5. Choose the symbol points.",min = 1, max = 20, step = 1, value = 1),
-                              selectInput("agecolpt", "6. Choose the color points.", 
-                                          choices = c("Black" = 1,
-                                                      "Red" = 2,
-                                                      "Green" = 3,
-                                                      "Blue" = 4,
-                                                      "Cyan" = 5,
-                                                      "Magenta" = 6,
-                                                      "Yellow" = 7,
-                                                      "Gray" = 8),
-                                          multiple = F, selected = 1),
-                                    
-                              radioButtons("downloadfile", "Select the file type:",
-                                          choices = c("tiff" = "tiff", 
-                                                     "jpeg" = "jpeg")),
-                              numericInput("width", "Width (px):", value = 2400, min = 800, max = 4000),
-                              numericInput("height", "Height (px):", value = 1800, min = 600, max = 3000),
-                              numericInput("res", "Resolution (dpi):", value = 300, min = 72, max = 300)
-                          ),
-                                  
-                          box(title = "Plot",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              plotOutput("plot")
-                          )
-                        )
-                )
-
-
-ModelGraphsAge <- tabItem(tabName = "models",
-                          fluidRow(
-                            tabBox(
-                              title = "Input",
-                              tabPanel(
-                                title = "Models",
-                                status = "primary",
-                                solidHeader = T,
-                                collapsible = TRUE,
-                                          
-                                checkboxInput("modelsvbgf","von Bertalanffy", F),
-                                checkboxInput("modelsgomp","Gompertz", F),
-                                checkboxInput("modelslog","Logistic", F),
-                                                
-                                checkboxInput("boot","Bootstrap", F),
-                                numericInput("nboot", "How many bootstrap do you want?",
-                                              value = 999),
-                                                  
-                                plotOutput("plot2", brush = "plot_brush")
-                              ),
-      
-                              tabPanel(
-                                title = "von Bertalanffy",
-                                status = "primary",
-                                solidHeader = T,
-                                collapsible = TRUE,
-                                  
-                                shinyjs::useShinyjs(),
-                                sliderInput("vbgfL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
-                                sliderInput("vbgfK", "K", min = 0, max = 5, value = 1, step = 0.01),
-                                sliderInput("vbgft0", "t0", min = -2.5, max = 2.5, value = 0, step = 0.01),
-                                  
-                                plotOutput("plot3", brush = "plot_brush")
-                              ),
-          
-                              tabPanel(
-                                title = "Gompertz",
-                                status = "primary",
-                                
-                                sliderInput("gompL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
-                                sliderInput("gompgi", "gi", min = 0.001, max = 10, value = 5, step = 0.01),
-                                sliderInput("gompti", "ti", min = -5, max = 5, value = 0, step = 0.01),
-                                  
-                                plotOutput("plot4", brush = "plot_brush")
-                              ),
-                                
-                              tabPanel(
-                                title = "Logistic",
-                                status = "primary",
-                                sliderInput("logL", "Linf/Winf", min = 0, max = 1000, value = 50, step = 1),
-                                sliderInput("logginf", "gninf", min = 0.001, max = 5, value = 2.5, step = 0.01),
-                                sliderInput("logti", "ti", min = -5, max = 5, value = 0, step = 0.01),
-                                  
-                                plotOutput("plot5", brush = "plot_brush")
+GraphInputLWR <- {tabItem(tabName = "graphlwr",
+                         fluidRow(
+                           tabBox(
+                             title = "Input",
+                             tabPanel(
+                               title = "Variables",
+                               status = "primary",
+                               solidHeader = T,
+                               collapsible = TRUE,
+                               
+                               helpText("Choose the variables below"),
+                               selectInput("lwrx", "1. Select x-variable:",
+                                           choices = "", selected = "", multiple = F),
+                               
+                               selectInput("lwry", "2. Select y-variable:",
+                                           choices = "", selected = "", multiple = F),
+                               
+                               selectInput("lwrfactor", "3. Select factor-variable:",
+                                           choices = "", selected = "None", multiple = F),
+                               
+                               radioButtons("lwrmodel", "4. Select the model:",
+                                            choices = c("Non-Linear" = 1, 
+                                                        "Linear" = 0)),
+                               
+                               checkboxInput("lwrIC", "Interval Confidence", F),
+                               
+                               shinyjs::useShinyjs(),
+                               helpText("Set the seed parameters values below"),
+                               sliderInput("lwrA", "Intercept (a)", min = -2, max = 2, value = 0.01, step = 0.01),
+                               sliderInput("lwrB", "Slope (b)", min = 0, max = 5, value = 3, step = 0.1),
+                             ),
+                             
+                             tabPanel(
+                               title = "Graphical Parameters",
+                               status = "primary",
+                               solidHeader = T,
+                               collapsible = TRUE,
+                               
+                               helpText("Set the graphical parameters below (Optional)"),
+                               textInput("xlablwr", "3. Type the x-label."),
+                               textInput("ylablwr", "4. Type the y-label."),
+                               
+                               numericInput("lwrpch", "5. Choose the symbol points.",
+                                            min = 1, max = 20, step = 1, value = 1),
+                               selectInput("lwrcolpt", "6. Choose the color points.", 
+                                           choices = c("Black" = 1,
+                                                       "Red" = 2,
+                                                       "Green" = 3,
+                                                       "Blue" = 4,
+                                                       "Cyan" = 5,
+                                                       "Magenta" = 6,
+                                                       "Yellow" = 7,
+                                                       "Gray" = 8),
+                                           multiple = F, selected = 1),
+                               
+                               sliderInput("lwrptsize", "7. Point size:",
+                                           min = 0.1, max = 3, value = 1, step = 0.1),
+                               sliderInput("lwrptalpha", "8. Point opacity:",
+                                           min = 0, max = 1, value = 1, step = 0.01),
+                               
+                               radioButtons("downloadfilelwr", "Select the file type:",
+                                            choices = c("tiff" = "tiff", 
+                                                        "jpeg" = "jpeg")),
+                               numericInput("widthlwr", "Width (px):", value = 2400, min = 800, max = 4000),
+                               numericInput("heightlwr", "Height (px):", value = 1800, min = 600, max = 3000),
+                               numericInput("reslwr", "Resolution (dpi):", value = 300, min = 72, max = 300)
                               )
                             ),
-    
-                          tabBox(
-                            title = "Fit",
-                            tabPanel(
-                              title = "von Bertalanffy",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              plotOutput("vbgfBoot2"),
-                              downloadButton("downVBGF", 
-                                             "Download the plot"),
-                              verbatimTextOutput("modVBGF2"),
-                              downloadButton("downloadDataVBGF",
-                                             "Download stats")
-                            ),
-                            
-                            tabPanel(
-                              title = "Gompertz",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              plotOutput("gomBoot"),
-                              downloadButton("downGomp", 
-                                             "Download the plot"),
-                              verbatimTextOutput("modGom2"),
-                              downloadButton("downloadDataGomp",
-                                             "Download stats") 
-                            ),
-                            
-                            tabPanel(
-                              title = "Logistic",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              plotOutput("logBoot2"),
-                              downloadButton("downLog", 
-                                             "Download the plot"),
-                              verbatimTextOutput("modLog2"),
-                              downloadButton("downloadDataLog",
-                                             "Download stats") 
-                            ),
-                            
-                            tabPanel(
-                              title = "All model",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE,
-                              plotOutput("todos"),
-                              downloadButton("downAll", 
-                                             "Download the plot"),
-                              tableOutput("AICprint"),
-                              downloadButton("downloadAIC", 
-                                             "Download the AIC table")
-                            )
+                           
+                           box(title = "Plot",
+                               status = "primary",
+                               solidHeader = T,
+                               collapsible = TRUE,
+                               plotOutput("plotlwr"),
+                               downloadButton("downLWRplot", 
+                                              "Download the plot"),
+                               verbatimTextOutput("plotlwrstat"),
+                               downloadButton("downLWRstat",
+                                              "Download stats") 
+                           )
                           )
-                        )
-                  )
-
-KimuraAge <- tabItem(tabName = "kimura",
-                    fluidRow(
-                      box(
-                        title = "Kimura",
-                        status = "primary",
-                        solidHeader = T,
-                        collapsible = TRUE,
-                        
-                        selectInput("kimurafactor", "Which group?", 
-                                    choices = "", selected = "", multiple = F),
-                        radioButtons(inputId = "kimuramodel",
-                                     label = "Model",
-                                     choices = c("von Bertalanffy" = 1,
-                                                 "Gompertz" = 2,
-                                                 "Logistic" = 3))),
-                      
-                      box(
-                        title = "Stats",
-                        status = "primary",
-                        solidHeader = T,
-                        collapsible = TRUE,
-                        downloadButton("downloadKimura", 
-                                       "Download stats"),
-                        verbatimTextOutput("kimuraTab")
-                      )
-                    )
-                  )
+                        )}
 
 
 shinyUI(
@@ -345,6 +433,7 @@ shinyUI(
                  ".shiny-output-error:before { visibility: hidden; }"),
       tabItems(Home,
                LWRInput,
+               GraphInputLWR,
                AgeInput,
                GraphInputAge, 
                ModelGraphsAge,

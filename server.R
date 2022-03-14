@@ -7,22 +7,361 @@
 #####
 ##################################################
 
-check.packages <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-  if (length(new.pkg)) 
-    install.packages(new.pkg, dependencies = TRUE)
-  sapply(pkg, require, character.only = TRUE)
-}
+# check.packages <- function(pkg){
+#   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+#   if (length(new.pkg)) 
+#     install.packages(new.pkg, dependencies = TRUE)
+#   sapply(pkg, require, character.only = TRUE)
+# }
 
-# Usage example
-packages<-c("shiny", "FSA", "fishmethods", "AICcmodavg", 
-            "nlstools", "shinydashboard", "shinyWidgets", 
-            "ggplot2", "waiter","shinyalert")
-check.packages(packages)
+# # Usage example
+# packages<-c("shiny", "FSA", "fishmethods", "AICcmodavg", 
+#             "nlstools", "shinydashboard", "shinyWidgets", 
+#             "ggplot2", "waiter","shinyalert")
+#check.packages(packages)
+
+library("shiny")
+library("FSA")
+library("fishmethods")
+library("AICcmodavg")
+library("nlstools")
+library("shinydashboard")
+library("shinyWidgets")
+library("ggplot2")
+library("waiter")
+library("shinyalert")
 
 # if(!any(check.packages(packages)==F)){
-  shinyServer(function(session,input, output) {
+shinyServer(function(session,input, output) {
     
+    # Length-Weight Relationship (LWR)
+    lwrdata <- reactive({
+      file1 <- input$lwrfile
+      if(is.null(file1)) {return()}
+      read.table(file = file1$datapath,
+                 sep = input$lwrsep,
+                 header = input$lwrheader,
+                 stringsAsFactors = input$lwrstringAsFactors)
+    })
+  
+    # LWR - Variables and Graphical parameters
+    observe(
+      {
+        Vxlwr<-1:length(colnames(lwrdata()))
+        atr_listlwr<-list(names = colnames(lwrdata()))
+        attributes(Vxlwr)<-atr_listlwr
+        Faclwr<-!sapply(lwrdata(), is.factor)
+        Vxlwr<-Vxlwr[Faclwr]
+        updateSelectInput(session, "lwrx", "1. Select x-variable",
+                          choices = Vxlwr)
+      })
+    
+    observe(
+      {
+        Vylwr<-1:length(colnames(lwrdata()))
+        atr_listlwr<-list(names = colnames(lwrdata()))
+        attributes(Vylwr)<-atr_listlwr
+        Faclwr<-!sapply(lwrdata(), is.factor)
+        Vylwr<-Vylwr[Faclwr]
+        updateSelectInput(session, "lwry", "2. Select y-variable",
+                          choices = Vylwr)
+      })
+    
+    lwrx <- reactive({
+      as.numeric(input$lwrx)
+    })
+    
+    lwry <- reactive({
+        as.numeric(input$lwry)
+    })
+    
+    lwrpch<-reactive({
+      as.numeric(input$lwrpch)
+    })
+    
+    lwrcolpt<-reactive({
+      as.numeric(input$lwrcolpt)
+    })
+    
+    output$fileoblwr <- renderPrint({
+      if(is.null(input$lwrfile)) {return()}
+      str(lwrdata())
+    })
+    
+    output$summlwr <- renderPrint({
+      if(is.null(input$lwrfile)) {return()}
+      summary(lwrdata())
+    })
+    
+    output$tableuilwr <- renderUI({
+      dataout <- lwrdata()
+      output$dataout<-renderDataTable(dataout)
+      dataTableOutput("dataout")
+    })
+    
+    output$lwrtb <- renderUI({
+      if(is.null(input$lwrfile)) {return()}
+      tabsetPanel(
+        tabPanel("Data",
+                 uiOutput("tableuilwr")),
+        
+        tabPanel("Structure",
+                 verbatimTextOutput("fileoblwr")),
+        
+        tabPanel("Summary",
+                 verbatimTextOutput("summlwr"))
+      )
+    })
+  
+    lwrA <- reactive({
+      as.numeric(input$lwrA)
+    })
+    
+    lwrB <- reactive({
+      as.numeric(input$lwrB)
+    })
+    
+    lwrptsize <- reactive({
+      as.numeric(input$lwrptsize)
+    })
+    
+    lwrptalpha <- reactive({
+      as.numeric(input$lwrptalpha)
+    })
+
+    modLWRnls<-reactive({
+      dados<-na.omit(lwrdata())
+      dados<-data.frame(x = dados[, lwrx()],
+                        y = dados[, lwry()]) 
+      
+      a <- lwrA()
+      b <- lwrB()
+      
+      fitnls <- nls(y ~ a * x ^ b,
+                      data = dados,
+                      start = list(a = a, b = b))
+      
+      mods$fitLWRnls<-fitnls
+      return(fitnls)
+    })
+    
+    modLWRlm<-reactive({
+      dados<-na.omit(lwrdata())
+      dados<-subset(dados, dados[, lwrx()] > 0 & dados[, lwry()] > 0)
+      dados<-data.frame(x = log(dados[, lwrx()]),
+                        y = log(dados[, lwry()])) 
+      
+      a <- lwrA()
+      b <- lwrB()
+      
+      fitlm <- lm(y ~ x, data = dados)
+      
+      mods$fitLWRlm<-fitlm
+      return(fitlm)
+    })
+    
+    lwrallometric <- reactive({
+      if(input$lwrmodel==1){
+        mod <- modLWRnls()
+        S <- summary(mod)
+        
+        B0<- 3
+        Bh1<-coef(mod)[2]
+        epBh1<-S$coefficients[2,2]
+        
+        t <- abs(B0 - Bh1)/epBh1
+        p <- pt(t, S$df[2], lower.tail = F)
+        
+      } else{
+        mod <- modLWRlm()
+        S <- summary(mod)
+        
+        B0<- 1
+        Bh1<-coef(mod)[2]
+        epBh1<-S$coefficients[2,2]
+        
+        t <- abs(B0 - Bh1)/epBh1
+        p <- pt(t, S$df[2], lower.tail = F)
+      }
+      
+      if(p < 0.05){
+        if(Bh1 > B0){
+          Status <- "Positive allometric"
+        } else
+          Status <- "Negative allometric"
+      } else{
+        Status <- "Isometric"
+      }
+      
+      return(data.frame(bH0 = B0, bH1 = Bh1,
+                        t = t, df = S$df[2], 'p-value' = p,
+                        status = Status))
+    })
+  
+    output$plotlwr <- renderPlot({
+      dados<-na.omit(lwrdata())
+      dados<-data.frame(x = dados[, lwrx()],
+                        y = dados[, lwry()])
+      
+      gg <- ggplot() +
+        geom_point(data = dados, aes(x = x, y = y),
+                   colour = lwrcolpt(), shape = lwrpch(),
+                   alpha = lwrptalpha(), size = lwrptsize())+
+        theme_bw(base_size = 14) + 
+        xlab(input$xlablwr) + ylab(input$ylablwr) +
+        theme(axis.text = element_text(size=15, face = "bold", color = "black"),
+              axis.title = element_text(size=15, face = "bold", color = "black"),
+              strip.text = element_text(size=15, face = "bold", color = "black"))
+      
+      xseq <- seq(min(dados$x), max(dados$x), 0.01)
+      DF <- data.frame(x = xseq,
+                       NLS = NA)
+      
+      if(input$lwrmodel==1){
+        fitmod <- modLWRnls()
+
+        a <- coef(fitmod)[1]
+        b <- coef(fitmod)[2]
+
+        DF$NLS <- a * xseq ^ b
+        
+        gg <- gg + 
+              geom_line(data = DF, aes(x = x, 
+                                       y = NLS),
+                        color = "black", size = 1.25)
+        
+        if(input$lwrIC){
+          bootP<-matrix(NA, ncol = 2, nrow = 999)
+          nls.control(maxiter = 100, minFactor = 1/2048, tol = 1e-07)
+
+          for(i in 1:999){
+            NewSamplesLT <- dados[sample(1:nrow(dados), replace = T),]
+            try(fitv1fNew <- nls(y ~ a * x ^ b,
+                                 data = NewSamplesLT,
+                                 start = list(a = a,
+                                              b = b)),
+                silent = T)
+
+            bootP[i,1]<-coef(fitv1fNew)[1]
+            bootP[i,2]<-coef(fitv1fNew)[2]
+          }
+          
+        xseq <- seq(min(dados$x), max(dados$x), length.out = 999)
+        LCI <- UCI <- seq()
+        for(i in 1:length(xseq)){
+          TL <-  bootP[ , 1] * xseq[i] ^ bootP[ ,2]
+          LCI[ i ] <- quantile( TL, 0.025 , na.rm = T)
+          UCI[ i ] <- quantile( TL, 0.975 , na.rm = T)
+        }
+        
+        DF <- data.frame(x = xseq,
+                         NLS = NA)
+        DF$NLS <- a * xseq ^ b
+        
+        DF$LCI<-LCI
+        DF$UCI<-UCI
+
+        gg<-gg+
+            geom_line(data = DF, aes(x = x, y = NLS),
+                      colour = "black", size = 1.25)+
+            geom_ribbon(data = DF, aes(x = x, ymin = LCI, ymax = UCI),
+                        alpha=0.2)
+        }
+      }
+      else{
+        fitmod<-modLWRlm()
+        dados<-subset(dados, dados$x > 0 & dados$y > 0)
+        dados<-data.frame(x = log(dados$x),
+                          y = log(dados$y))
+
+        a <- coef(fitmod)[1]
+        b <- coef(fitmod)[2]
+
+        xseq <- seq(min(dados$x), max(dados$x), 0.01)
+        DF <- data.frame(x = xseq,
+                         LM = NA )
+        DF$LM <- a + xseq * b
+        
+        gg <- ggplot(data = dados, aes(x = x, y = y)) +
+                geom_point(colour = lwrcolpt(), shape = lwrpch(),
+                           alpha = lwrptalpha(), size = lwrptsize())+
+                theme_bw(base_size = 14) +
+                xlab(input$xlablwr) + ylab(input$ylablwr) +
+                theme(axis.text = element_text(size=15, face = "bold", color = "black"),
+                      axis.title = element_text(size=15, face = "bold", color = "black"),
+                      strip.text = element_text(size=15, face = "bold", color = "black"))
+        
+        if(input$lwrIC){
+          gg <- gg+geom_smooth(method = "lm",colour = "black", 
+                               se = T, level = 0.95)
+        }
+        else{
+          gg <- gg+geom_line(data = DF, aes(x = x, y = LM),
+                    colour = "black", size = 1.25)
+        }
+      }
+    
+      graphs$basiclwr<-gg
+      print(gg)
+    })
+  
+    
+    output$downLWRstat <- downloadHandler(
+      filename = "LWR stats.txt", 
+      content = function(file) {
+        if(input$lwrmodel==1){
+          sink(file)
+            print(overview(modLWRnls()))
+            print(lwrallometric())
+          sink()  
+        } else {
+          sink(file)
+            print(summary(modLWRlm()))
+            print(lwrallometric())
+          sink()
+        }
+      })
+    
+    output$plotlwrstat <- renderPrint({
+      if(input$lwrmodel==1){
+        print(overview(modLWRnls()))
+        print(lwrallometric())
+      } else {
+        print(summary(modLWRlm()))
+        print(lwrallometric())
+      }
+    })
+    
+    widthlwr <- reactive({
+      as.numeric(input$widthlwr)
+    })
+    
+    heightlwr <- reactive({
+      as.numeric(input$heightlwr)
+    })
+    
+    reslwr <- reactive({
+      as.numeric(input$reslwr)
+    })
+    
+    output$downLWRplot <- downloadHandler(
+      filename = function(){
+        paste("LWR", input$downloadfilelwr, sep = ".")
+      },
+      content = function(file){
+        if(input$downloadfilelwr=="tiff")
+          tiff(file, width = widthlwr(), height = heightlwr(), res= reslwr())
+        else
+          jpeg(file, width = widthlwr(), height = heightlwr(), res= reslwr())
+        
+        print(graphs$basiclwr)
+        dev.off()
+      }
+    )  
+    
+    ######################################## 
+    ######################################## 
+    ######################################## 
     # Age Input
     agedata <- reactive({
       file1 <- input$agefile
@@ -64,15 +403,14 @@ check.packages(packages)
       as.numeric(input$agey)
     })
     
-
     output$plot <- renderPlot({
       dados<-na.omit(agedata())
-
-      x<-dados[, x()]
-      y<-dados[, y()]
+      dados<-data.frame(x = dados[, x()],
+                        y = dados[, y()])
       
-      gg <- ggplot(data = dados, aes(x = x, y = y)) +
-        geom_point(colour = agecolpt(), shape = agepch())+
+      gg <- ggplot() +
+        geom_point(data = dados, aes(x = x, y = y),
+                   colour = agecolpt(), shape = agepch())+
         theme_bw(base_size = 14) + 
         xlab(input$xlab) + ylab(input$ylab) +
         theme(axis.text=element_text(size=15, face = "bold", color = "black"),
@@ -87,18 +425,9 @@ check.packages(packages)
       as.numeric(input$agepch)
     })
     
-    lwrpch<-reactive({
-      as.numeric(input$lwrpch)
-    })
-    
     agecolpt<-reactive({
       as.numeric(input$agecolpt)
     })
-    
-    lwrcolpt<-reactive({
-      as.numeric(input$lwrcolpt)
-    })
-    
     
     # Growth models
     plotInput <- reactive({
@@ -107,7 +436,7 @@ check.packages(packages)
       x<-dados[, x()]
       y<-dados[, y()]
 
-      x<-seq(min(x, na.rm = T),max(x, na.rm = T), 0.1)
+      x<-seq(min(x, na.rm = T), max(x, na.rm = T), 0.1)
       dataY<-data.frame(x = x,
                         VBGF = NA,
                         Gomp = NA,
@@ -247,8 +576,8 @@ check.packages(packages)
       if(input$modelsvbgf == F){return()}
       else{
         dados<-na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()])
         
         Seeds<-vbStarts(Y~age, data = dados, type = "typical")
         
@@ -264,8 +593,8 @@ check.packages(packages)
       if(input$modelsvbgf == F){return()}
       else{
         dados<-na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()])
         
         Seeds<-vbStarts(Y ~ age, data = dados,
                         type = "typical")
@@ -282,8 +611,8 @@ check.packages(packages)
       if(input$modelsvbgf == F){return()}
       else{
         dados<-na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()])
         
         Seeds<-vbStarts(Y ~ age, data = dados, type = "typical")
         
@@ -299,8 +628,8 @@ check.packages(packages)
       if(input$modelsgomp == F){return()}
       else{
         dados <- na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()])
         
         Seeds<-vbStarts(Y ~ age, data = dados, type = "typical")
         
@@ -316,8 +645,8 @@ check.packages(packages)
       if(input$modelsgomp == F){return()}
       else{
         dados <- na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()]) 
         
         Seeds <-vbStarts(Y ~ age, data = dados, type = "typical")
         
@@ -333,8 +662,8 @@ check.packages(packages)
       if(input$modelsgomp == F){return()}
       else{
         dados <- na.omit(agedata())
-        age <- dados[, x()]
-        Y <- dados[, y()]
+        dados<-data.frame(age = dados[, x()],
+                          Y = dados[, y()]) 
         
         Seeds<-vbStarts(Y ~ age, data = dados, type = "typical")
         
@@ -375,11 +704,6 @@ check.packages(packages)
                   verbatimTextOutput("summ"))
         )
     })
-    
-    # output$table <-renderTable({
-    #   if(is.null(input$file)) {return()}
-    #   agedata()
-    # })
     
     
     # Graphical resolution
@@ -491,8 +815,9 @@ check.packages(packages)
         pred$UCI<-UCI
         
         gg<-gg+
-          geom_line(data = pred, aes(x = x, y = LCI))+
-          geom_line(data = pred, aes(x = x, y = UCI))
+          geom_ribbon(data = pred, 
+                      aes(x = x, ymin = LCI, ymax = UCI),
+                      alpha=0.2)
       }
       
       graphs$vbgf<-gg
@@ -577,8 +902,9 @@ check.packages(packages)
         pred$UCI<-UCI
         
         gg<-gg+
-          geom_line(data = pred, aes(x = x, y = LCI))+
-          geom_line(data = pred, aes(x = x, y = UCI))
+          geom_ribbon(data = pred, 
+                      aes(x = x, ymin = LCI, ymax = UCI),
+                      alpha=0.2)
       }
       
       graphs$gomp<-gg
@@ -667,8 +993,9 @@ check.packages(packages)
         pred$UCI<-UCI
         
         gg<-gg+
-          geom_line(data = pred, aes(x = x, y = LCI))+
-          geom_line(data = pred, aes(x = x, y = UCI))
+            geom_ribbon(data = pred, 
+                           aes(x = x, ymin = LCI, ymax = UCI),
+                           alpha=0.2)
       }
       
       graphs$log<-gg

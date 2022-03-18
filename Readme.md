@@ -1,10 +1,3 @@
----
-title: "FiShiny"
-author: "Jonas Vasconcelos"
-date: '2022-02-24'
-output: html_document
----
-
 <p align="center"><a href="https://jonasvasconcelos.shinyapps.io/fishiny/?_ga=2.158772986.1906815402.1647603278-1329163440.1646699208" target="_blank"><img src="https://github.com/JonasVasconcelos/FiShiny/blob/main/www/logo.png" width="400"></a></p>
 
 <p align="center">

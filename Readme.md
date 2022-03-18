@@ -16,7 +16,7 @@ output: html_document
 2. [Description](#Description)
 3. [Features](#Features)
 4. [Usage](#Usage)
-
+5. [Support](#Support)
 
 ## FiShiny <a name="fishiny"></a>
 [**FiShiny**](https://jonasvasconcelos.shinyapps.io/fishiny/?_ga=2.158772986.1906815402.1647603278-1329163440.1646699208) is a personal, non-profit and ongoing project that aims to implement and optimize processes focused on fisheries biology, such as data collection, management, and analysis.
@@ -52,3 +52,5 @@ Until now, this application fits 1) Length-Weight Relationship (LWR) with linear
 
 5. Finally, do comparison group using the chi-square test of likelihood ratios.
 
+## Support <a name="Support"></a>
+Any questions or suggestions, [contact me](mailto:jonas.vasconcelos.filho@gmail.com)

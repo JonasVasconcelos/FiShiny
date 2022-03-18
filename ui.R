@@ -15,15 +15,16 @@
 # }
 
 library("shiny")
+library("devtools")
+library("nlstools")
 library("FSA")
 library("fishmethods")
-library("AICcmodavg")
-library("nlstools")
 library("shinydashboard")
 library("shinyWidgets")
 library("ggplot2")
 library("waiter")
 library("shinyalert")
+library("AICcmodavg")
 
 
 title <- a(href="https://github.com/JonasVasconcelos",
@@ -356,12 +357,16 @@ GraphInputLWR <- {tabItem(tabName = "graphlwr",
                                             choices = c("Non-Linear" = 1, 
                                                         "Linear" = 0)),
                                
-                               checkboxInput("lwrIC", "Interval Confidence", F),
+                               checkboxInput("lwrIC", "Confidence Interval", F),
+                               sliderInput("lwrICalpha", "Level", min = 0, max = 1, 
+                                           value = 0.95, step = 0.01),
                                
                                shinyjs::useShinyjs(),
                                helpText("Set the seed parameters values below"),
-                               sliderInput("lwrA", "Intercept (a)", min = -2, max = 2, value = 0.01, step = 0.01),
-                               sliderInput("lwrB", "Slope (b)", min = 0, max = 5, value = 3, step = 0.1),
+                               sliderInput("lwrA", "Intercept (a)", min = -2, max = 2,
+                                           value = 0.01, step = 0.01),
+                               sliderInput("lwrB", "Slope (b)", min = 0, max = 5, 
+                                           value = 3, step = 0.1),
                              ),
                              
                              tabPanel(

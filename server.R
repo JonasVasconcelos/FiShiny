@@ -94,9 +94,9 @@ shinyServer(function(session,input, output) {
     })
     
     output$tableuilwr <- renderUI({
-      dataout <- lwrdata()
-      output$dataout<-renderDataTable(dataout)
-      dataTableOutput("dataout")
+      dataoutlwr <- lwrdata()
+      output$dataoutlwr<-renderDataTable(dataoutlwr)
+      dataTableOutput("dataoutlwr")
     })
     
     output$lwrtb <- renderUI({
@@ -129,6 +129,10 @@ shinyServer(function(session,input, output) {
       as.numeric(input$lwrptalpha)
     })
 
+    lwrICalpha <- reactive({
+      as.numeric(input$lwrICalpha)
+    })
+    
     modLWRnls<-reactive({
       dados<-na.omit(lwrdata())
       dados<-data.frame(x = dados[, lwrx()],
@@ -250,8 +254,8 @@ shinyServer(function(session,input, output) {
         LCI <- UCI <- seq()
         for(i in 1:length(xseq)){
           TL <-  bootP[ , 1] * xseq[i] ^ bootP[ ,2]
-          LCI[ i ] <- quantile( TL, 0.025 , na.rm = T)
-          UCI[ i ] <- quantile( TL, 0.975 , na.rm = T)
+          LCI[ i ] <- quantile( TL, (1-lwrICalpha())/2 , na.rm = T)
+          UCI[ i ] <- quantile( TL, 1-(1-lwrICalpha())/2 , na.rm = T)
         }
         
         DF <- data.frame(x = xseq,
@@ -293,7 +297,7 @@ shinyServer(function(session,input, output) {
         
         if(input$lwrIC){
           gg <- gg+geom_smooth(method = "lm",colour = "black", 
-                               se = T, level = 0.95)
+                               se = T, level = lwrICalpha())
         }
         else{
           gg <- gg+geom_line(data = DF, aes(x = x, y = LM),
@@ -685,17 +689,17 @@ shinyServer(function(session,input, output) {
       summary(agedata())
     })
     
-    output$tableui <- renderUI({
-      dataout <- agedata()
-      output$dataout<-renderDataTable(dataout)
-      dataTableOutput("dataout")
+    output$tableuiage <- renderUI({
+      dataoutage <- agedata()
+      output$dataoutage<-renderDataTable(dataoutage)
+      dataTableOutput("dataoutage")
     })
     
     output$agetb <- renderUI({
       if(is.null(input$agefile)) {return()}
       tabsetPanel(
         tabPanel("Data",
-                  uiOutput("tableui")),
+                  uiOutput("tableuiage")),
                   
         tabPanel("Structure",
                   verbatimTextOutput("fileob")),
@@ -704,7 +708,6 @@ shinyServer(function(session,input, output) {
                   verbatimTextOutput("summ"))
         )
     })
-    
     
     # Graphical resolution
     width <- reactive({

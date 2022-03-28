@@ -30,6 +30,7 @@ library("shinyWidgets")
 library("ggplot2")
 library("waiter")
 library("shinyalert")
+library("rethinking")
 
 # if(!any(check.packages(packages)==F)){
 shinyServer(function(session,input, output) {
@@ -133,33 +134,109 @@ shinyServer(function(session,input, output) {
       as.numeric(input$lwrICalpha)
     })
     
+    lwrfactor<-reactive({
+      as.numeric(input$lwrfactor)
+    })
+    
+    observe(
+      {
+        Vx<-1:length(colnames(lwrdata()))
+        atr_list<-list(names = colnames(lwrdata()))
+        attributes(Vx)<-atr_list
+        Fac<-!sapply(lwrdata(), is.factor)
+        Vx<-c("None", Vx[!Fac])
+        updateSelectInput(session, "lwrfactor", "3. Select factor-variable:",
+                          choices = Vx, selected = "None")
+      })
+    
     modLWRnls<-reactive({
-      dados<-na.omit(lwrdata())
-      dados<-data.frame(x = dados[, lwrx()],
-                        y = dados[, lwry()]) 
-      
-      a <- lwrA()
-      b <- lwrB()
-      
-      fitnls <- nls(y ~ a * x ^ b,
+      if(!is.na(lwrfactor())){
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()],
+                          factor = as.factor(lwrdata()[, lwrfactor()]))
+        a <- lwrA()
+        b <- lwrB()
+        
+        fitnls <- nls(y ~ a * x ^ b,
                       data = dados,
                       start = list(a = a, b = b))
-      
+        
+        fitnlsANCOVA<-glm(y ~ x + factor, data = dados)
+        S<-summary(fitnlsANCOVA)
+        nlsH1<-any(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha())
+        mods$nlsH1<-nlsH1
+        
+        if(nlsH1){
+          Lfactors <- levels(dados$factor)
+          Nfactors <- length(Lfactors)
+          ResultadosFactors <- data.frame("Estimate"  = NA,
+                                          "Std.Error" = NA,
+                                          "t-value" = NA,
+                                          "p-value" = NA)
+          
+          for(i in 1:Nfactors){
+            mod <- nls(y ~ a * x ^ b,
+                         data = dados[dados$factor == Lfactors[i],],
+                         start = list(a = a, b = b))
+            Coef<-as.data.frame(summary(mod)$coefficients)
+            colnames(Coef)<-colnames(ResultadosFactors)
+            ResultadosFactors <- rbind.data.frame(ResultadosFactors,
+                                                  Coef)
+          }
+          #fitnls <- fitnlsANCOVA
+        }
+        
+        ResultadosFactors <- ResultadosFactors[-1,]
+        ResultadosFactors$Parameters <- rep(c("a","b"), Nfactors)
+        ResultadosFactors$Factor <- rep(Lfactors, each=2)
+        ResultadosFactors<-ResultadosFactors[, c(6,5,1:4)]
+        
+        mods$ResultadosFactors<-ResultadosFactors
+        mods$fitnlsANCOVA<-fitnlsANCOVA
+        
+      } else {
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()]) 
+        dados<-na.omit(dados)
+        
+        a <- lwrA()
+        b <- lwrB()
+        
+        fitnls <- nls(y ~ a * x ^ b,
+                      data = dados,
+                      start = list(a = a, b = b))
+      }
+        
       mods$fitLWRnls<-fitnls
       return(fitnls)
     })
-    
+
     modLWRlm<-reactive({
-      dados<-na.omit(lwrdata())
-      dados<-subset(dados, dados[, lwrx()] > 0 & dados[, lwry()] > 0)
-      dados<-data.frame(x = log(dados[, lwrx()]),
-                        y = log(dados[, lwry()])) 
-      
-      a <- lwrA()
-      b <- lwrB()
-      
-      fitlm <- lm(y ~ x, data = dados)
-      
+      if(!is.na(lwrfactor())){
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()],
+                          factor = lwrdata()[, lwrfactor()])
+        dados<-subset(dados, dados$x > 0 & dados$y > 0)
+        dados$x<-log(dados$x)
+        dados$y<-log(dados$y)
+        a <- lwrA()
+        b <- lwrB()
+        
+        fitlm <- lm(y ~ x + factor, data = dados)
+        
+      } else {
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()]) 
+        
+        dados<-subset(dados, dados$x > 0 & dados$y > 0)
+        dados$x<-log(dados$x)
+        dados$y<-log(dados$y)
+        a <- lwrA()
+        b <- lwrB()
+        
+        fitlm <- lm(y ~ x, data = dados)
+      }
+    
       mods$fitLWRlm<-fitlm
       return(fitlm)
     })
@@ -203,21 +280,43 @@ shinyServer(function(session,input, output) {
     })
   
     output$plotlwr <- renderPlot({
-      dados<-na.omit(lwrdata())
-      dados<-data.frame(x = dados[, lwrx()],
-                        y = dados[, lwry()])
-      
+      if(!is.na(lwrfactor())){
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()],
+                          factor = lwrdata()[, lwrfactor()])
+      } else {
+        dados<-data.frame(x = lwrdata()[, lwrx()],
+                          y = lwrdata()[, lwry()]) 
+      }
+      dados<-na.omit(dados)
+
+      if(input$lwrmodel!=1){
+        dados<-subset(dados, dados$x > 0 & dados$y > 0)
+        dados$x<-log(dados$x)
+        dados$y<-log(dados$y)
+      }
+        
       gg <- ggplot() +
-        geom_point(data = dados, aes(x = x, y = y),
-                   colour = lwrcolpt(), shape = lwrpch(),
-                   alpha = lwrptalpha(), size = lwrptsize())+
-        theme_bw(base_size = 14) + 
-        xlab(input$xlablwr) + ylab(input$ylablwr) +
-        theme(axis.text = element_text(size=15, face = "bold", color = "black"),
-              axis.title = element_text(size=15, face = "bold", color = "black"),
-              strip.text = element_text(size=15, face = "bold", color = "black"))
+              theme_bw(base_size = 14) + 
+              xlab(input$xlablwr) + ylab(input$ylablwr) +
+              theme(axis.text = element_text(size=15, face = "bold", color = "black"),
+                    axis.title = element_text(size=15, face = "bold", color = "black"),
+                    strip.text = element_text(size=15, face = "bold", color = "black"))
       
-      xseq <- seq(min(dados$x), max(dados$x), 0.01)
+      if(!is.na(lwrfactor())){
+        gg <- gg +
+                geom_point(data = dados, aes(x = x, y = y, color = factor),
+                           shape = lwrpch(), alpha = lwrptalpha(), size = lwrptsize())+
+                labs(color = colnames(lwrdata())[lwrfactor()])
+      }else{
+        gg <- gg +
+              geom_point(data = dados, aes(x = x, y = y),
+                         colour = lwrcolpt(), shape = lwrpch(),
+                         alpha = lwrptalpha(), size = lwrptsize())
+      }
+      
+      
+      xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
       DF <- data.frame(x = xseq,
                        NLS = NA)
       
@@ -235,10 +334,10 @@ shinyServer(function(session,input, output) {
                         color = "black", size = 1.25)
         
         if(input$lwrIC){
-          bootP<-matrix(NA, ncol = 2, nrow = 999)
+          bootP<-matrix(NA, ncol = 2, nrow = 299)
           nls.control(maxiter = 100, minFactor = 1/2048, tol = 1e-07)
 
-          for(i in 1:999){
+          for(i in 1:299){
             NewSamplesLT <- dados[sample(1:nrow(dados), replace = T),]
             try(fitv1fNew <- nls(y ~ a * x ^ b,
                                  data = NewSamplesLT,
@@ -250,7 +349,7 @@ shinyServer(function(session,input, output) {
             bootP[i,2]<-coef(fitv1fNew)[2]
           }
           
-        xseq <- seq(min(dados$x), max(dados$x), length.out = 999)
+        xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
         LCI <- UCI <- seq()
         for(i in 1:length(xseq)){
           TL <-  bootP[ , 1] * xseq[i] ^ bootP[ ,2]
@@ -274,34 +373,33 @@ shinyServer(function(session,input, output) {
       }
       else{
         fitmod<-modLWRlm()
-        dados<-subset(dados, dados$x > 0 & dados$y > 0)
-        dados<-data.frame(x = log(dados$x),
-                          y = log(dados$y))
-
+        
         a <- coef(fitmod)[1]
         b <- coef(fitmod)[2]
 
-        xseq <- seq(min(dados$x), max(dados$x), 0.01)
+        xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
         DF <- data.frame(x = xseq,
                          LM = NA )
         DF$LM <- a + xseq * b
         
-        gg <- ggplot(data = dados, aes(x = x, y = y)) +
-                geom_point(colour = lwrcolpt(), shape = lwrpch(),
-                           alpha = lwrptalpha(), size = lwrptsize())+
-                theme_bw(base_size = 14) +
-                xlab(input$xlablwr) + ylab(input$ylablwr) +
-                theme(axis.text = element_text(size=15, face = "bold", color = "black"),
-                      axis.title = element_text(size=15, face = "bold", color = "black"),
-                      strip.text = element_text(size=15, face = "bold", color = "black"))
+        p <- extract.samples( fitmod )
+        mu.ci <- sapply( xseq , function(xseq) PI( p[,1] + p[,2]*xseq , 
+                                                   prob = lwrICalpha()))
+        DF$LCI<-t(mu.ci)[,1]
+        DF$UCI<-t(mu.ci)[,2]
         
         if(input$lwrIC){
-          gg <- gg+geom_smooth(method = "lm",colour = "black", 
-                               se = T, level = lwrICalpha())
+          gg <- gg +
+                geom_line(data = DF, aes(x = x, y = LM),
+                          colour = "black", size = 1.25)+
+                geom_ribbon(data = DF, 
+                            aes(x = x, ymin = LCI, ymax = UCI),
+                            alpha=0.2)
         }
         else{
-          gg <- gg+geom_line(data = DF, aes(x = x, y = LM),
-                    colour = "black", size = 1.25)
+          gg <- gg+
+                geom_line(data = DF, aes(x = x, y = LM),
+                          colour = "black", size = 1.25)
         }
       }
     
@@ -328,8 +426,13 @@ shinyServer(function(session,input, output) {
     
     output$plotlwrstat <- renderPrint({
       if(input$lwrmodel==1){
-        print(overview(modLWRnls()))
-        print(lwrallometric())
+        if(mods$nlsH1){
+          print(summary(mods$fitnlsANCOVA)) ### Aqui! Alternar o layout pra estatistica sair abaixo do plot
+          print(lwrallometric())
+        }else{
+          print(overview(modLWRnls()))
+          print(lwrallometric())
+        }
       } else {
         print(summary(modLWRlm()))
         print(lwrallometric())
@@ -408,9 +511,9 @@ shinyServer(function(session,input, output) {
     })
     
     output$plot <- renderPlot({
-      dados<-na.omit(agedata())
-      dados<-data.frame(x = dados[, x()],
-                        y = dados[, y()])
+      dados<-data.frame(x = agedata()[, x()],
+                        y = agedata()[, y()]) 
+      dados<-na.omit(dados)
       
       gg <- ggplot() +
         geom_point(data = dados, aes(x = x, y = y),
@@ -1210,9 +1313,9 @@ shinyServer(function(session,input, output) {
         atr_list<-list(names = colnames(agedata()))
         attributes(Vx)<-atr_list
         Fac<-!sapply(agedata(), is.factor)
-        Vx<-Vx[!Fac]
+        Vx<-c("None", Vx[!Fac])
         updateSelectInput(session, "kimurafactor", "Which group?",
-                          choices = Vx)
+                          choices = Vx, selected = "None")
       })
     
     kimura <- reactive({

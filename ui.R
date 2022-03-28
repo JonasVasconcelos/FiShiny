@@ -334,10 +334,10 @@ LWRInput <- {tabItem(tabName = "lwrinput",
                   )}
 
 GraphInputLWR <- {tabItem(tabName = "graphlwr",
-                         fluidRow(
-                           tabBox(
-                             title = "Input",
-                             tabPanel(
+                        fluidRow(
+                          tabBox(
+                           title = "Input",
+                           tabPanel(
                                title = "Variables",
                                status = "primary",
                                solidHeader = T,
@@ -406,19 +406,39 @@ GraphInputLWR <- {tabItem(tabName = "graphlwr",
                               )
                             ),
                            
-                           box(title = "Plot",
-                               status = "primary",
-                               solidHeader = T,
-                               collapsible = TRUE,
-                               plotOutput("plotlwr"),
-                               downloadButton("downLWRplot", 
-                                              "Download the plot"),
-                               verbatimTextOutput("plotlwrstat"),
-                               downloadButton("downLWRstat",
-                                              "Download stats") 
-                           )
+                          tabBox(
+                            title = "Output",
+                            tabPanel(
+                              title = "Plot",
+                              status = "primary",
+                              solidHeader = T,
+                              collapsible = TRUE,
+                      
+                              plotOutput("plotlwr"),
+                              downloadButton("downLWRplot", 
+                                            "Download the plot")
+                            ),
+                            tabPanel(
+                                  title = "Stats",
+                                  status = "primary",
+                                  solidHeader = T,
+                                  collapsible = TRUE,
+                                 
+                                  verbatimTextOutput("plotlwrstat"),
+                                  downloadButton("downLWRstat",
+                                                 "Download stats")
+                            ),
+                            tabPanel(
+                              title = "ANCOVA",
+                              status = "primary",
+                              solidHeader = T,
+                              collapsible = TRUE
+                              
+                              
+                            )
                           )
-                        )}
+                        )
+)}
 
 
 shinyUI(

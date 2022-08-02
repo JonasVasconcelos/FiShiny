@@ -57,21 +57,28 @@ sidebar <- {dashboardSidebar(
                                    icon = icon("fas fa-chart-line")),
                        menuSubItem("Kimura", tabName = "kimura",
                                    icon = icon("question"))
-              ),
-              
-              menuItem(text = "Morphometrics", tabName = "morpho", 
-                       icon = icon("ruler-horizontal"),
-                       menuSubItem(text = "Input Images", tabName = "morphoinput", 
-                                   icon = icon("upload")),
-                       menuSubItem("Measurement", tabName = "graph", 
-                                   icon = icon("ruler-horizontal"))
               )
+              # ,
+              # 
+              # menuItem(text = "Morphometrics", tabName = "morpho", 
+              #          icon = icon("ruler-horizontal"),
+              #          menuSubItem(text = "Input Images", tabName = "morphoinput", 
+              #                      icon = icon("upload")),
+              #          menuSubItem("Measurement", tabName = "graph", 
+              #                      icon = icon("ruler-horizontal"))
+              # )
   )
 )}
 
-Home <- {tabItem(tabName = "home",
-                p("Do you have trouble with growth model fits? Your problems are over there that is an easy way to fit the von Bertalanffy, Gompertz, and Logistic functions. And as a tip, you can set how many bootstraps you want for confidence intervals, use the Akaike criterion for model evaluation, and run comparisons between groups.",
-                style = "font-family: 'helvetica'; font-size: 12pt; text-align: justify"))}
+Home <- {
+  tabItem(
+    tabName = "home",
+    p(
+      "Do you have trouble with growth model fits? Your problems are over there that is an easy way to fit the von Bertalanffy, Gompertz, and Logistic functions. And as a tip, you can set how many bootstraps you want for confidence intervals, use the Akaike criterion for model evaluation, and run comparisons between groups.",
+      style = "font-family: 'helvetica'; font-size: 12pt; text-align: justify"
+    )
+  )
+}
 
 AgeInput <- {tabItem(tabName = "ageinput",
                     fluidRow(
@@ -416,26 +423,28 @@ GraphInputLWR <- {tabItem(tabName = "graphlwr",
                       
                               plotOutput("plotlwr"),
                               downloadButton("downLWRplot", 
-                                            "Download the plot")
-                            ),
-                            tabPanel(
-                                  title = "Stats",
-                                  status = "primary",
-                                  solidHeader = T,
-                                  collapsible = TRUE,
-                                 
-                                  verbatimTextOutput("plotlwrstat"),
-                                  downloadButton("downLWRstat",
-                                                 "Download stats")
-                            ),
-                            tabPanel(
-                              title = "ANCOVA",
-                              status = "primary",
-                              solidHeader = T,
-                              collapsible = TRUE
-                              
-                              
+                                            "Download the plot"),
+                              verbatimTextOutput("plotlwrstat"),
+                              downloadButton("downLWRstat",
+                                             "Download stats")
                             )
+                            # ,
+                            # tabPanel(
+                            #       title = "ANOVA/ANCOVA",
+                            #       status = "primary",
+                            #       solidHeader = T,
+                            #       collapsible = TRUE,
+                            #      
+                            #       verbatimTextOutput("plotlwrstat"),
+                            #       downloadButton("downLWRstat",
+                            #                      "Download stats")
+                            # ),
+                            # tabPanel(
+                            #   title = "Stats",
+                            #   status = "primary",
+                            #   solidHeader = T,
+                            #   collapsible = TRUE
+                            # )
                           )
                         )
 )}

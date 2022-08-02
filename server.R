@@ -31,440 +31,692 @@ library("ggplot2")
 library("waiter")
 library("shinyalert")
 library("rethinking")
+library("tidyverse")
+library("investr")
 
 # if(!any(check.packages(packages)==F)){
 shinyServer(function(session,input, output) {
-    
-    # Length-Weight Relationship (LWR)
-    lwrdata <- reactive({
-      file1 <- input$lwrfile
-      if(is.null(file1)) {return()}
-      read.table(file = file1$datapath,
-                 sep = input$lwrsep,
-                 header = input$lwrheader,
-                 stringsAsFactors = input$lwrstringAsFactors)
-    })
   
-    # LWR - Variables and Graphical parameters
-    observe(
-      {
-        Vxlwr<-1:length(colnames(lwrdata()))
-        atr_listlwr<-list(names = colnames(lwrdata()))
-        attributes(Vxlwr)<-atr_listlwr
-        Faclwr<-!sapply(lwrdata(), is.factor)
-        Vxlwr<-Vxlwr[Faclwr]
-        updateSelectInput(session, "lwrx", "1. Select x-variable",
-                          choices = Vxlwr)
-      })
-    
-    observe(
-      {
-        Vylwr<-1:length(colnames(lwrdata()))
-        atr_listlwr<-list(names = colnames(lwrdata()))
-        attributes(Vylwr)<-atr_listlwr
-        Faclwr<-!sapply(lwrdata(), is.factor)
-        Vylwr<-Vylwr[Faclwr]
-        updateSelectInput(session, "lwry", "2. Select y-variable",
-                          choices = Vylwr)
-      })
-    
-    lwrx <- reactive({
-      as.numeric(input$lwrx)
-    })
-    
-    lwry <- reactive({
-        as.numeric(input$lwry)
-    })
-    
-    lwrpch<-reactive({
-      as.numeric(input$lwrpch)
-    })
-    
-    lwrcolpt<-reactive({
-      as.numeric(input$lwrcolpt)
-    })
-    
-    output$fileoblwr <- renderPrint({
-      if(is.null(input$lwrfile)) {return()}
-      str(lwrdata())
-    })
-    
-    output$summlwr <- renderPrint({
-      if(is.null(input$lwrfile)) {return()}
-      summary(lwrdata())
-    })
-    
-    output$tableuilwr <- renderUI({
-      dataoutlwr <- lwrdata()
-      output$dataoutlwr<-renderDataTable(dataoutlwr)
-      dataTableOutput("dataoutlwr")
-    })
-    
-    output$lwrtb <- renderUI({
-      if(is.null(input$lwrfile)) {return()}
-      tabsetPanel(
-        tabPanel("Data",
-                 uiOutput("tableuilwr")),
-        
-        tabPanel("Structure",
-                 verbatimTextOutput("fileoblwr")),
-        
-        tabPanel("Summary",
-                 verbatimTextOutput("summlwr"))
-      )
-    })
+  ###################################
+  #### Length-Weight Relationship (LWR)
+  # Data
+  lwrdata <- reactive({
+    file1 <- input$lwrfile
+    if(is.null(file1)) {return()}
+    read.table(file = file1$datapath,
+               sep = input$lwrsep,
+               header = input$lwrheader,
+               stringsAsFactors = input$lwrstringAsFactors)
+  })
   
-    lwrA <- reactive({
-      as.numeric(input$lwrA)
-    })
-    
-    lwrB <- reactive({
-      as.numeric(input$lwrB)
-    })
-    
-    lwrptsize <- reactive({
-      as.numeric(input$lwrptsize)
-    })
-    
-    lwrptalpha <- reactive({
-      as.numeric(input$lwrptalpha)
-    })
+  # LWR - Variables
+  observe({
+      Vxlwr<-1:length(colnames(lwrdata()))
+      atr_listlwr<-list(names = colnames(lwrdata()))
+      attributes(Vxlwr)<-atr_listlwr
+      Faclwr<-!sapply(lwrdata(), is.factor)
+      Vxlwr<-Vxlwr[Faclwr]
+      updateSelectInput(session, "lwrx", "1. Select x-variable",
+                        choices = Vxlwr)
+  })
+  
+  observe({
+      Vylwr<-1:length(colnames(lwrdata()))
+      atr_listlwr<-list(names = colnames(lwrdata()))
+      attributes(Vylwr)<-atr_listlwr
+      Faclwr<-!sapply(lwrdata(), is.factor)
+      Vylwr<-Vylwr[Faclwr]
+      updateSelectInput(session, "lwry", "2. Select y-variable",
+                        choices = Vylwr)
+  })
+  
+  observe({
+    Vx<-1:length(colnames(lwrdata()))
+    atr_list<-list(names = colnames(lwrdata()))
+    attributes(Vx)<-atr_list
+    Fac<-!sapply(lwrdata(), is.factor)
+    Vx<-c("None", Vx[!Fac])
+    updateSelectInput(session, "lwrfactor", "3. Select factor-variable:",
+                      choices = Vx, selected = "None")
+  })
+  
+  ## Table, summary, and structure
+  output$fileoblwr <- renderPrint({
+    if(is.null(input$lwrfile)) {return()}
+    str(lwrdata())
+  })
+  
+  output$summlwr <- renderPrint({
+    if(is.null(input$lwrfile)) {return()}
+    summary(lwrdata())
+  })
+  
+  output$tableuilwr <- renderUI({
+    dataoutlwr <- lwrdata()
+    output$dataoutlwr<-renderDataTable(dataoutlwr)
+    dataTableOutput("dataoutlwr")
+  })
+  
+  output$lwrtb <- renderUI({
+    if(is.null(input$lwrfile)) {return()}
+    tabsetPanel(
+      tabPanel("Data",
+               uiOutput("tableuilwr")),
+      
+      tabPanel("Structure",
+               verbatimTextOutput("fileoblwr")),
+      
+      tabPanel("Summary",
+               verbatimTextOutput("summlwr"))
+    )
+  })
 
-    lwrICalpha <- reactive({
-      as.numeric(input$lwrICalpha)
-    })
-    
-    lwrfactor<-reactive({
-      as.numeric(input$lwrfactor)
-    })
-    
-    observe(
-      {
-        Vx<-1:length(colnames(lwrdata()))
-        atr_list<-list(names = colnames(lwrdata()))
-        attributes(Vx)<-atr_list
-        Fac<-!sapply(lwrdata(), is.factor)
-        Vx<-c("None", Vx[!Fac])
-        updateSelectInput(session, "lwrfactor", "3. Select factor-variable:",
-                          choices = Vx, selected = "None")
-      })
-    
-    modLWRnls<-reactive({
-      if(!is.na(lwrfactor())){
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()],
-                          factor = as.factor(lwrdata()[, lwrfactor()]))
-        a <- lwrA()
-        b <- lwrB()
+  # Graphical parameters
+  lwrx <- reactive({
+    as.numeric(input$lwrx)
+  })
+  
+  lwry <- reactive({
+    as.numeric(input$lwry)
+  })
+  
+  lwrpch<-reactive({
+    as.numeric(input$lwrpch)
+  })
+  
+  lwrcolpt<-reactive({
+    as.numeric(input$lwrcolpt)
+  })
+  
+  lwrA <- reactive({
+    as.numeric(input$lwrA)
+  })
+  
+  lwrB <- reactive({
+    as.numeric(input$lwrB)
+  })
+  
+  lwrptsize <- reactive({
+    as.numeric(input$lwrptsize)
+  })
+  
+  lwrptalpha <- reactive({
+    as.numeric(input$lwrptalpha)
+  })
+  
+  lwrICalpha <- reactive({
+    as.numeric(input$lwrICalpha)
+  })
+  
+  lwrfactor<-reactive({
+    as.numeric(input$lwrfactor)
+  })
+  
+  widthlwr <- reactive({
+    as.numeric(input$widthlwr)
+  })
+  
+  heightlwr <- reactive({
+    as.numeric(input$heightlwr)
+  })
+  
+  reslwr <- reactive({
+    as.numeric(input$reslwr)
+  })
+  
+  ##############################
+  ## Models
+  modLWRnls2<-reactive({
+    mods$lwr_Lm_Ancova_H1 <- FALSE
+    H0 <- 3
+    if(!is.na(lwrfactor())){
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()],
+                        factor = lwrdata()[, lwrfactor()])
+      
+      a <- lwrA()
+      b <- lwrB()
+      
+      ancova <- glm(y ~ x + factor, data = dados)
+      AOV <- summary(aov(ancova))
+      AOV <- AOV[[1]]
+      pvalue <- AOV$`Pr(>F)`[2]
+
+      
+      if(pvalue < (1-lwrICalpha())){
+        mods$lwr_Lm_Ancova_H1 <- TRUE
+        N <- levels(dados$factor)
+        DF <- as.data.frame(matrix(NA, nrow = (2*length(N)), ncol = 8))
+        Linha <- seq(1, (2*length(N))-1, 2)
         
-        fitnls <- nls(y ~ a * x ^ b,
-                      data = dados,
-                      start = list(a = a, b = b))
-        
-        fitnlsANCOVA<-glm(y ~ x + factor, data = dados)
-        S<-summary(fitnlsANCOVA)
-        nlsH1<-any(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha())
-        mods$nlsH1<-nlsH1
-        
-        if(nlsH1){
-          Lfactors <- levels(dados$factor)
-          Nfactors <- length(Lfactors)
-          ResultadosFactors <- data.frame("Estimate"  = NA,
-                                          "Std.Error" = NA,
-                                          "t-value" = NA,
-                                          "p-value" = NA)
+        for(i in 1:length(N)){
+          subdata <- subset(dados, dados$factor == N[i])
+          mod <- nls(y ~ a * x^b,
+                     data= subdata,
+                     start = list(a = a, 
+                                  b = b))
+          S<-summary(mod)
+          DF[Linha[i]:(Linha[i]+1), 1] <- N[i]
+          DF[Linha[i]:(Linha[i]+1), 2] <- c('intercept', "slope")
+          DF[Linha[i]:(Linha[i]+1), 3:4] <- round(S$coefficients[ ,1:2], 4)
           
-          for(i in 1:Nfactors){
-            mod <- nls(y ~ a * x ^ b,
-                         data = dados[dados$factor == Lfactors[i],],
-                         start = list(a = a, b = b))
-            Coef<-as.data.frame(summary(mod)$coefficients)
-            colnames(Coef)<-colnames(ResultadosFactors)
-            ResultadosFactors <- rbind.data.frame(ResultadosFactors,
-                                                  Coef)
+          
+          DF[Linha[i]:(Linha[i]+1), 5] <- round(abs(H0 - DF[Linha[i]:(Linha[i]+1), 3]) / 
+                                                DF[Linha[i]:(Linha[i]+1), 4], 4)
+          DF[Linha[i]:(Linha[i]+1), 6] <- S$df[2]
+          DF[Linha[i]:(Linha[i]+1), 7] <- round(pt(DF[Linha[i]:(Linha[i]+1), 5],
+                                             DF[Linha[i]:(Linha[i]+1), 6], lower.tail = F), 4)
+        }
+        for(j in 1:nrow(DF)){
+          if(DF[j, 7] < (1 - lwrICalpha())){
+            if(DF[j, 3] > H0){
+              DF[j, 8] <-  "Positive allometric"
+            } else
+              DF[j, 8] <-  "Negative allometric"
+          } else{
+            DF[j, 8] <- "Isometric"
           }
-          #fitnls <- fitnlsANCOVA
         }
         
-        ResultadosFactors <- ResultadosFactors[-1,]
-        ResultadosFactors$Parameters <- rep(c("a","b"), Nfactors)
-        ResultadosFactors$Factor <- rep(Lfactors, each=2)
-        ResultadosFactors<-ResultadosFactors[, c(6,5,1:4)]
+        colnames(DF)<-c("Group",
+                        "Parameter",
+                        "Estimate",
+                        "Std. Error",
+                        "t value",
+                        'df',
+                        "Pr(>|t|)",
+                        'Status')
         
-        mods$ResultadosFactors<-ResultadosFactors
-        mods$fitnlsANCOVA<-fitnlsANCOVA
-        
+        mods$lwr_Lm_fits<-DF #[seq(2, length(N)*2,2), ]
       } else {
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()]) 
-        dados<-na.omit(dados)
+        DF <- as.data.frame(matrix(NA, nrow = 2, ncol = 7))
+        mod <- nls(y ~ a * x^b,
+                   data= dados,
+                   start = list(a = a, 
+                                b = b))
+        S<-summary(mod)
+        DF[, 1] <- "Polled"
+        DF[, 2] <- c('intercept', "slope")
+        DF[, 3:4] <- round(S$coefficients[ ,1:2], 4)
         
-        a <- lwrA()
-        b <- lwrB()
+        DF[2, 5] <- round(abs(H0 - DF[2, 3]) / 
+                          DF[2, 4], 4)
+        DF[2, 6] <- S$df[2]
+        DF[2, 7] <- round(pt(DF[2, 5], DF[2, 6], lower.tail = F), 4)
         
-        fitnls <- nls(y ~ a * x ^ b,
-                      data = dados,
-                      start = list(a = a, b = b))
-      }
+        if(DF[2, 7] < (1 - lwrICalpha())){
+          if(DF[2, 3] > H0){
+            DF[2, 8] <-  "Positive allometric"
+          } else {
+            DF[2, 8] <-  "Negative allometric"
+          }
+        } else{
+          DF[2, 8] <- "Isometric"
+        }
         
-      mods$fitLWRnls<-fitnls
-      return(fitnls)
-    })
-
-    modLWRlm<-reactive({
-      if(!is.na(lwrfactor())){
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()],
-                          factor = lwrdata()[, lwrfactor()])
-        dados<-subset(dados, dados$x > 0 & dados$y > 0)
-        dados$x<-log(dados$x)
-        dados$y<-log(dados$y)
-        a <- lwrA()
-        b <- lwrB()
-        
-        fitlm <- lm(y ~ x + factor, data = dados)
-        
-      } else {
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()]) 
-        
-        dados<-subset(dados, dados$x > 0 & dados$y > 0)
-        dados$x<-log(dados$x)
-        dados$y<-log(dados$y)
-        a <- lwrA()
-        b <- lwrB()
-        
-        fitlm <- lm(y ~ x, data = dados)
-      }
-    
-      mods$fitLWRlm<-fitlm
-      return(fitlm)
-    })
-    
-    lwrallometric <- reactive({
-      if(input$lwrmodel==1){
-        mod <- modLWRnls()
-        S <- summary(mod)
-        
-        B0<- 3
-        Bh1<-coef(mod)[2]
-        epBh1<-S$coefficients[2,2]
-        
-        t <- abs(B0 - Bh1)/epBh1
-        p <- pt(t, S$df[2], lower.tail = F)
-        
-      } else{
-        mod <- modLWRlm()
-        S <- summary(mod)
-        
-        B0<- 1
-        Bh1<-coef(mod)[2]
-        epBh1<-S$coefficients[2,2]
-        
-        t <- abs(B0 - Bh1)/epBh1
-        p <- pt(t, S$df[2], lower.tail = F)
+        colnames(DF)<-c("Group",
+                        "Parameter",
+                        "Estimate",
+                        "Std. Error",
+                        "t value",
+                        'df',
+                        "Pr(>|t|)",
+                        "Status")
+        mods$lwr_Lm_fits<-DF #[2, ]
       }
       
-      if(p < 0.05){
-        if(Bh1 > B0){
-          Status <- "Positive allometric"
+      mods$lwr_Lm_AOV<-AOV
+      
+    } else {
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()]) 
+      
+      a <- lwrA()
+      b <- lwrB()
+      
+      mod <- nls(y ~ a * x^b,
+                 data= dados,
+                 start = list(a = a, 
+                              b = b))
+      AOV <- summary(mod)
+      mods$lwr_Lm_AOV<-AOV
+      
+      DF <- as.data.frame(matrix(NA, nrow = 2, ncol = 8))
+      S<-summary(mod)
+      DF[1:2, 1] <- "Polled"
+      DF[1:2, 2] <- c('intercept', "slope")
+      DF[1:2, 3:4] <- round(S$coefficients[, 1:2], 4)
+      
+      DF[2, 5] <- round(abs(H0 - DF[2, 3])/
+                                DF[2, 4],4)
+      DF[2, 6] <- S$df[2]
+      DF[2, 7] <- pt(DF[2, 5],
+                     DF[2, 6], lower.tail = F)
+      
+      if(DF[2, 7] < (1- lwrICalpha())){
+        if(DF[2, 3] > H0){
+          DF[2, 8] <-  "Positive allometric"
         } else
-          Status <- "Negative allometric"
+          DF[2, 8] <-  "Negative allometric"
       } else{
-        Status <- "Isometric"
+        DF[2, 8] <- "Isometric"
       }
       
-      return(data.frame(bH0 = B0, bH1 = Bh1,
-                        t = t, df = S$df[2], 'p-value' = p,
-                        status = Status))
-    })
+      colnames(DF)<-c("Group",
+                      "Parameter",
+                      "Estimate",
+                      "Std. Error",
+                      "t value",
+                      'df',
+                      "Pr(>|t|)", 
+                      'Status')
+      
+      mods$lwr_Lm_fits<-DF
+    }
+    
+    return(mods$lwr_Lm_fits)
+  })
   
-    output$plotlwr <- renderPlot({
-      if(!is.na(lwrfactor())){
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()],
-                          factor = lwrdata()[, lwrfactor()])
-      } else {
-        dados<-data.frame(x = lwrdata()[, lwrx()],
-                          y = lwrdata()[, lwry()]) 
-      }
-      dados<-na.omit(dados)
+  modLWRlm<-reactive({
+    mods$lwr_Lm_Ancova_H1 <- FALSE
+    if(!is.na(lwrfactor())){
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()],
+                        factor = lwrdata()[, lwrfactor()])
+      dados<-subset(dados, dados$x > 0 & dados$y > 0)
+      dados$x<-log(dados$x)
+      dados$y<-log(dados$y)
+      a <- lwrA()
+      b <- lwrB()
+      
+      fitlm <- lm(y ~ factor + x + factor:x, data = dados)
+      AOV <- anova(fitlm)
+      pvalue <- AOV$`Pr(>F)`[1]
 
-      if(input$lwrmodel!=1){
-        dados<-subset(dados, dados$x > 0 & dados$y > 0)
-        dados$x<-log(dados$x)
-        dados$y<-log(dados$y)
-      }
+      if(pvalue < (1-lwrICalpha())){
+        mods$lwr_Lm_Ancova_H1 <- TRUE
+        N <- levels(dados$factor)
+        DF <- as.data.frame(matrix(NA, nrow = (2*length(N)), ncol = 8))
+        Linha <- seq(1, (2*length(N))-1, 2)
         
-      gg <- ggplot() +
-              theme_bw(base_size = 14) + 
-              xlab(input$xlablwr) + ylab(input$ylablwr) +
-              theme(axis.text = element_text(size=15, face = "bold", color = "black"),
-                    axis.title = element_text(size=15, face = "bold", color = "black"),
-                    strip.text = element_text(size=15, face = "bold", color = "black"))
-      
-      if(!is.na(lwrfactor())){
-        gg <- gg +
-                geom_point(data = dados, aes(x = x, y = y, color = factor),
-                           shape = lwrpch(), alpha = lwrptalpha(), size = lwrptsize())+
-                labs(color = colnames(lwrdata())[lwrfactor()])
-      }else{
-        gg <- gg +
-              geom_point(data = dados, aes(x = x, y = y),
-                         colour = lwrcolpt(), shape = lwrpch(),
-                         alpha = lwrptalpha(), size = lwrptsize())
-      }
-      
-      
-      xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
-      DF <- data.frame(x = xseq,
-                       NLS = NA)
-      
-      if(input$lwrmodel==1){
-        fitmod <- modLWRnls()
-
-        a <- coef(fitmod)[1]
-        b <- coef(fitmod)[2]
-
-        DF$NLS <- a * xseq ^ b
-        
-        gg <- gg + 
-              geom_line(data = DF, aes(x = x, 
-                                       y = NLS),
-                        color = "black", size = 1.25)
-        
-        if(input$lwrIC){
-          bootP<-matrix(NA, ncol = 2, nrow = 299)
-          nls.control(maxiter = 100, minFactor = 1/2048, tol = 1e-07)
-
-          for(i in 1:299){
-            NewSamplesLT <- dados[sample(1:nrow(dados), replace = T),]
-            try(fitv1fNew <- nls(y ~ a * x ^ b,
-                                 data = NewSamplesLT,
-                                 start = list(a = a,
-                                              b = b)),
-                silent = T)
-
-            bootP[i,1]<-coef(fitv1fNew)[1]
-            bootP[i,2]<-coef(fitv1fNew)[2]
+        for(i in 1:length(N)){
+          subdata <- subset(dados, dados$factor == N[i])
+          mod <- lm(y ~ x, data= subdata)
+          S<-summary(mod)
+          DF[Linha[i]:(Linha[i]+1), 1] <- N[i] # adaptar a nova tabela de allometria para sair somente o slope pra factor
+          DF[Linha[i]:(Linha[i]+1), 2] <- c('intercept', "slope")
+          DF[Linha[i]:(Linha[i]+1), 3:4] <- round(S$coefficients[,-4],4)
+          
+          B0 <- 1
+          DF[(Linha[i]+1), 5] <- round(abs(B0 - DF[(Linha[i]+1), 3]) / DF[(Linha[i]+1), 4],4)
+          DF[Linha[i]:(Linha[i]+1), 6] <- S$df[2]
+          DF[(Linha[i]+1), 7]  <- round(pt(DF[(Linha[i]+1), 5],
+                                           DF[(Linha[i]+1), 6], lower.tail = F), 4)
+          
+          if(DF[(Linha[i]+1), 7] < (1-lwrICalpha())){
+            if(DF[(Linha[i]+1), 3] > B0){
+              DF[(Linha[i]+1), 8] <-  "Positive allometric"
+            } else
+              DF[(Linha[i]+1), 8] <-  "Negative allometric"
+          } else{
+            DF[(Linha[i]+1), 8] <- "Isometric"
           }
           
-        xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
-        LCI <- UCI <- seq()
-        for(i in 1:length(xseq)){
-          TL <-  bootP[ , 1] * xseq[i] ^ bootP[ ,2]
-          LCI[ i ] <- quantile( TL, (1-lwrICalpha())/2 , na.rm = T)
-          UCI[ i ] <- quantile( TL, 1-(1-lwrICalpha())/2 , na.rm = T)
         }
         
-        DF <- data.frame(x = xseq,
-                         NLS = NA)
-        DF$NLS <- a * xseq ^ b
+        colnames(DF)<-c("Group",
+                        "Parameter",
+                        "Estimate",
+                        "Std. Error",
+                        "t value",
+                        'df',
+                        "Pr(>|t|)",
+                        'Body Growth Behavior')
+        DF <- DF[seq(2, length(N)*2, 2),]
+        mods$lwr_Lm_fits<-DF
+      } else {
+        DF <- as.data.frame(matrix(NA, nrow = 2, ncol = 8))
+        mod <- lm(y ~ x, data= dados)
+        S<-summary(mod)
+        DF[1, 1] <- "Polled"
+        DF[1, 2] <- "slope"
+        DF[1, 3:4] <- round(S$coefficients[2, 1:2],4)
         
-        DF$LCI<-LCI
-        DF$UCI<-UCI
-
-        gg<-gg+
-            geom_line(data = DF, aes(x = x, y = NLS),
-                      colour = "black", size = 1.25)+
-            geom_ribbon(data = DF, aes(x = x, ymin = LCI, ymax = UCI),
-                        alpha=0.2)
+        B0 <- 1
+        DF[1, 5] <- round(abs(B0 - DF[1, 3]) / DF[1, 4],4)
+        DF[1, 6] <- S$df[2]
+        DF[1, 7] <- round(pt(DF[1, 6], DF[1, 5],lower.tail = F),4)
+        
+        if(DF[1, 7] <  (1-lwrICalpha())){
+          if(DF[1, 3] > B0){
+            DF[1, 8] <-  "Positive allometric"
+          } else
+            DF[1, 8] <-  "Negative allometric"
+        } else{
+          DF[1, 8] <- "Isometric"
         }
+        colnames(DF)<-c("Group",
+                        "Parameter",
+                        "Estimate",
+                        "Std. Error",
+                        "t value",
+                        'df',
+                        "Pr(>|t|)",
+                        'Body Growth Behavior')
+        mods$lwr_Lm_fits<-DF
       }
-      else{
-        fitmod<-modLWRlm()
-        
-        a <- coef(fitmod)[1]
-        b <- coef(fitmod)[2]
+      
+      rownames(AOV) <- c(colnames(lwrdata())[lwrfactor()],
+                         colnames(lwrdata())[lwrx()],
+                         paste("",colnames(lwrdata())[lwrfactor()],
+                               ":",colnames(lwrdata())[lwrx()], sep = ""),
+                         "Residuals")
+      attributes(AOV)$heading[2]<-paste('Response:', colnames(lwrdata())[lwry()])
+      mods$lwr_Lm_AOV<-AOV
 
-        xseq <- c(seq(min(dados$x), max(dados$x), 0.1), max(dados$x))
-        DF <- data.frame(x = xseq,
-                         LM = NA )
-        DF$LM <- a + xseq * b
-        
-        p <- extract.samples( fitmod )
-        mu.ci <- sapply( xseq , function(xseq) PI( p[,1] + p[,2]*xseq , 
-                                                   prob = lwrICalpha()))
-        DF$LCI<-t(mu.ci)[,1]
-        DF$UCI<-t(mu.ci)[,2]
-        
-        if(input$lwrIC){
-          gg <- gg +
-                geom_line(data = DF, aes(x = x, y = LM),
-                          colour = "black", size = 1.25)+
-                geom_ribbon(data = DF, 
-                            aes(x = x, ymin = LCI, ymax = UCI),
-                            alpha=0.2)
-        }
-        else{
-          gg <- gg+
-                geom_line(data = DF, aes(x = x, y = LM),
-                          colour = "black", size = 1.25)
-        }
+    } else {
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()]) 
+      
+      dados<-subset(dados, dados$x > 0 & dados$y > 0)
+      dados$x<-log(dados$x)
+      dados$y<-log(dados$y)
+      a <- lwrA()
+      b <- lwrB()
+      
+      fitlm <- lm(y ~ x, data = dados)
+      AOV <- anova(fitlm)
+      rownames(AOV) <- c(colnames(lwrdata())[lwrx()],
+                         "Residuals")
+      attributes(AOV)$heading[2]<-paste('Response:', colnames(lwrdata())[lwry()])
+      mods$lwr_Lm_AOV<-AOV
+      
+      DF <- as.data.frame(matrix(NA, nrow = 1, ncol = 8))
+      S<-summary(fitlm)
+      DF[1, 1] <- "Polled"
+      DF[1, 2] <- "slope"
+      DF[1, 3:4] <- round(S$coefficients[2, 1:2],4)
+      
+      B0 <- 1
+      DF[1, 5] <- round(abs(B0 - DF[1, 3]) / DF[1, 4],4)
+      DF[1, 6] <- S$df[2]
+      DF[1, 7] <- round(pt(DF[1, 6], DF[1, 5],lower.tail = F),4)
+      
+      if(DF[1, 7] <  (1-lwrICalpha())){
+        if(DF[1, 3] > B0){
+          DF[1, 8] <-  "Positive allometric"
+        } else
+          DF[1, 8] <-  "Negative allometric"
+      } else{
+        DF[1, 8] <- "Isometric"
       }
+      colnames(DF)<-c("Group",
+                      "Parameter",
+                      "Estimate",
+                      "Std. Error",
+                      "t value",
+                      'df',
+                      "Pr(>|t|)",
+                      'Body Growth Behavior')
+      mods$lwr_Lm_fits<-DF
+    }
     
-      graphs$basiclwr<-gg
-      print(gg)
+    mods$fitLWRlm<-fitlm
+    return(fitlm)
+  }) 
+  
+  lwrANCOVA <- reactive({
+    if(input$lwrmodel==1){
+      bH0 <- "LWR are equals"
+      bH1 <- "LWR are not equals"
+      S <- summary(mods$fitnlsANCOVA)
+      nlsH1<-mods$nlsH1
+      if(nlsH1){ 
+        whoIsDifferent <- rownames(S$coefficients)[2+which(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha())]
+        DF <- as.data.frame(t(as.matrix(S$coefficients[2+which(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha()),])))
+        Status <- paste("Null hypothesis (H0) rejected. LWR of", whoIsDifferent, " is different", sep = "")
+      } else{
+        whoIsDifferent <- rownames(S$coefficients)[2+which(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha())]
+        DF <- as.data.frame(t(as.matrix(S$coefficients[2+which(S$coefficients[3:nrow(S$coefficients),4]<lwrICalpha()),])))
+        Status <- paste("Null hypothesis (H0) accepted. LWR curves are equals", sep = "")
+      }
+      
+      DF$bH0<-bH0
+      DF$bH1<-bH1
+      DF$Status <- Status
+      
+      DF<-DF[,c(5,6,1:4,7)]
+      return(DF)
+    }
+  })
+  
+  {
+  lwrallometric <- reactive({ # Porque a saida so funciona se essa porra tiver ativa?
+    if(input$lwrmodel==1){
+      mod <- modLWRnls2()
+      S <- summary(mod)
+
+      B0<- 3
+      Bh1<-coef(mod)[2]
+      epBh1<-S$coefficients[2,2]
+
+      t <- abs(B0 - Bh1)/epBh1
+      p <- pt(t, S$df[2], lower.tail = F)
+    } else{
+      mod <- modLWRlm()
+      S <- summary(mod)
+
+      B0<- 1
+      Bh1<-coef(mod)[2]
+      epBh1<-S$coefficients[2,2]
+
+      t <- abs(B0 - Bh1)/epBh1
+      p <- pt(t, S$df[2], lower.tail = F)
+    }
+
+    if(p < 0.05){
+      if(Bh1 > B0){
+        Status <- "Positive allometric"
+      } else
+        Status <- "Negative allometric"
+    } else{
+      Status <- "Isometric"
+    }
+
+    # return(data.frame(bH0 = B0, bH1 = Bh1,
+    #                   t = t, df = S$df[2],
+    #                   'p-value' = ifelse(p<0.000001, "<2e-16",p),
+    #                   status = Status))
+    return(mods$lwr_Lm_fits)
+  })
+  }
+  
+  output$plotlwr <- renderPlot({
+    if(!is.na(lwrfactor())){
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()],
+                        factor = lwrdata()[, lwrfactor()])
+    } else {
+      dados<-data.frame(x = lwrdata()[, lwrx()],
+                        y = lwrdata()[, lwry()]) 
+    }
+    
+    dados<-na.omit(dados)
+    a <- lwrA()
+    b <- lwrB()
+  
+    if(input$lwrmodel==1){
+      
+      parameters <- mods$lwr_Lm_fits
+      finalData <- dados[1,]
+      finalData$fit<-NA
+      finalData$lwr<-NA
+      finalData$upr<-NA
+        
+      if(mods$lwr_Lm_Ancova_H1){
+        listFactors <- levels(dados$factor)
+        
+        for(j in 1:length(listFactors)){
+          subData <- subset(dados, dados$factor == listFactors[j])
+          mod <- nls(y ~ a * x ^ b,
+                     data= subData,
+                     start = list(a = a, 
+                                  b = b))
+          subData <- cbind(subData, 
+                         as_tibble(predFit(mod, 
+                                           newdata = subData, 
+                                           interval = "confidence",
+                                           level= lwrICalpha())))
+          finalData<-rbind(finalData, subData)
+        }
+        dados<-finalData[-1,]
+        
+        gg <- ggplot(data = dados,
+                     aes(x = x, y = y, color=factor)) +
+          theme_bw(base_size = 14) +
+          xlab(input$xlablwr) + ylab(input$ylablwr) +
+          theme(axis.text = element_text(size=15,
+                                         face = "bold", color = "black"),
+                axis.title = element_text(size=15,
+                                          face = "bold", color = "black"),
+                strip.text = element_text(size=15,
+                                          face = "bold", color = "black")) +
+          geom_point(shape = lwrpch(),
+                     alpha = lwrptalpha(),
+                     size = lwrptsize())+
+          geom_line(aes(x= x, y = fit, color=factor), size=1.25)
+        
+        if(input$lwrIC) {
+          gg <- gg + geom_ribbon(aes(x = x, 
+                                     ymin = lwr, 
+                                     ymax = upr,
+                                     fill = factor),
+                                 alpha=0.2,
+                                 linetype = 0)
+        }
+        
+      } else {
+        mod <- nls(y ~ a * x ^ b,
+                   data= dados,
+                   start = list(a = a, 
+                                b = b))
+        dados <- cbind(dados, 
+                       as_tibble(predFit(mod, 
+                                         newdata = dados, 
+                                         interval = "confidence",
+                                         level= lwrICalpha())))
+
+        gg <- ggplot(data = dados,
+                     aes(x = x, y = y)) +
+          theme_bw(base_size = 14) +
+          xlab(input$xlablwr) + ylab(input$ylablwr) +
+          theme(axis.text = element_text(size=15,
+                                         face = "bold", color = "black"),
+                axis.title = element_text(size=15,
+                                          face = "bold", color = "black"),
+                strip.text = element_text(size=15,
+                                          face = "bold", color = "black")) +
+          geom_point(shape = lwrpch(),
+                     alpha = lwrptalpha(),
+                     size = lwrptsize())+
+          geom_line(aes(x= x, y = fit))
+        
+        if(input$lwrIC) {
+          gg <- gg + geom_ribbon(aes(x = x, ymin = lwr, ymax = upr),
+                                 alpha=0.2)
+        }
+      }
+    }  
+    else{
+      dados<-subset(dados, dados$x > 0 & dados$y > 0)
+      dados$x<-log(dados$x)
+      dados$y<-log(dados$y)
+      
+      gg <- ggplot(data = dados,
+                   aes(x = x, y = y)) +
+        theme_bw(base_size = 14) +
+        xlab(input$xlablwr) + ylab(input$ylablwr) +
+        theme(axis.text = element_text(size=15,
+                                       face = "bold", color = "black"),
+              axis.title = element_text(size=15,
+                                        face = "bold", color = "black"),
+              strip.text = element_text(size=15,
+                                        face = "bold", color = "black")) +
+        geom_point(shape = lwrpch(), 
+                   alpha = lwrptalpha(), 
+                   size = lwrptsize())
+        
+      if(mods$lwr_Lm_Ancova_H1){
+        gg <- gg +
+              geom_point(data = dados, 
+                     aes(x = x, y = y, color = factor),
+                     shape = lwrpch(), 
+                     alpha = lwrptalpha(), 
+                     size = lwrptsize())+
+              geom_smooth(data = dados, 
+                          aes(x = x, y = y, color=factor), 
+                          method = "lm", se = input$lwrIC,
+                          level = lwrICalpha())+
+              labs(color = colnames(lwrdata())[lwrfactor()])
+      } else {
+        gg <- gg +
+          geom_point(data = dados, 
+                     aes(x = x, y = y),
+                     shape = lwrpch(), 
+                     alpha = lwrptalpha(), 
+                     size = lwrptsize()) +
+          geom_smooth(data = dados, 
+                      aes(x = x, y = y), color = "black",
+                      method = "lm", se = input$lwrIC,
+                      level = lwrICalpha())
+      }
+    }
+    
+    graphs$basiclwr <- gg
+    print(gg)
+  })
+    
+  output$downLWRstat <- downloadHandler(
+    filename = "LWR stats.txt", 
+    content = function(file) {
+      if(input$lwrmodel==1){
+        sink(file)
+          print(modLWRnls2())
+          print(lwrallometric())
+        sink()  
+      } else {
+        sink(file)
+          print(summary(modLWRlm()))
+          print(lwrallometric())
+        sink()
+      }
     })
+
+  output$plotlwrstat <- renderPrint({
+    print(mods$lwr_Lm_AOV)
+    cat("\n\n")
+    print(summary(mods$fitLWRlm))
+    cat("\n\n")
+    cat("Body Growth Behavior \n")
+    print(lwrallometric(), row.names = FALSE)
+  })
+    
   
     
-    output$downLWRstat <- downloadHandler(
-      filename = "LWR stats.txt", 
-      content = function(file) {
-        if(input$lwrmodel==1){
-          sink(file)
-            print(overview(modLWRnls()))
-            print(lwrallometric())
-          sink()  
-        } else {
-          sink(file)
-            print(summary(modLWRlm()))
-            print(lwrallometric())
-          sink()
-        }
-      })
-    
-    output$plotlwrstat <- renderPrint({
-      if(input$lwrmodel==1){
-        if(mods$nlsH1){
-          print(summary(mods$fitnlsANCOVA)) ### Aqui! Alternar o layout pra estatistica sair abaixo do plot
-          print(lwrallometric())
-        }else{
-          print(overview(modLWRnls()))
-          print(lwrallometric())
-        }
-      } else {
-        print(summary(modLWRlm()))
-        print(lwrallometric())
-      }
-    })
-    
-    widthlwr <- reactive({
-      as.numeric(input$widthlwr)
-    })
-    
-    heightlwr <- reactive({
-      as.numeric(input$heightlwr)
-    })
-    
-    reslwr <- reactive({
-      as.numeric(input$reslwr)
-    })
-    
-    output$downLWRplot <- downloadHandler(
-      filename = function(){
-        paste("LWR", input$downloadfilelwr, sep = ".")
-      },
-      content = function(file){
-        if(input$downloadfilelwr=="tiff")
-          tiff(file, width = widthlwr(), height = heightlwr(), res= reslwr())
-        else
-          jpeg(file, width = widthlwr(), height = heightlwr(), res= reslwr())
-        
-        print(graphs$basiclwr)
-        dev.off()
-      }
-    )  
+  output$downLWRplot <- downloadHandler(
+    filename = function(){
+      paste("LWR", input$downloadfilelwr, sep = ".")
+    },
+    content = function(file){
+      if(input$downloadfilelwr=="tiff")
+        tiff(file, width = widthlwr(), height = heightlwr(), res= reslwr())
+      else
+        jpeg(file, width = widthlwr(), height = heightlwr(), res= reslwr())
+      
+      print(graphs$basiclwr)
+      dev.off()
+    }
+  )  
     
     ######################################## 
     ######################################## 
@@ -901,7 +1153,7 @@ shinyServer(function(session,input, output) {
       if(input$boot == T){
           for(i in 1:bootN()){
             NewSamplesLT <- dados[sample(1:nrow(dados), replace = T),] 
-            try(fitv1fNew <- nls(tl ~ v1(age, Linf, K, t0),
+            try(fitv1fNew = nls(tl ~ v1(age, Linf, K, t0),
                                  data = NewSamplesLT,
                                  start = svv1f),
                 silent = T)
